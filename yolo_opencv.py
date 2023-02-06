@@ -14,26 +14,28 @@ import datetime
 
 ap = argparse.ArgumentParser()
 ap.add_argument('-i', '--input', required=False,
-                help = 'path to input image', default = 'sampledata')
+                help='path to input image', default='sampledata')
 ap.add_argument('-o', '--outputfile', required=False,
-                help = 'filename for output video', default='output.mp4')
+                help='filename for output video', default='output.mp4')
 ap.add_argument('-od', '--outputdir', required=False,
-                help = 'path to output folder', default = 'output')
+                help='path to output folder', default='output')
 ap.add_argument('-fs', '--framestart', required=False,
-                help = 'start frame', default=0)
+                help='start frame', default=0)
 ap.add_argument('-fl', '--framelimit', required=False,
-                help = 'number of frames to process (0 = all)', default=0)
+                help='number of frames to process (0 = all)', default=0)
 ap.add_argument('-c', '--config', required=False,
-                help = 'path to yolo config file', default = 'cfg/yolov3-tiny.cfg')
+                help='path to yolo config file', default='cfg/yolov3-tiny.cfg')
 ap.add_argument('-w', '--weights', required=False,
-                help = 'path to yolo pre-trained weights', default = 'yolov3-tiny.weights')
+                help='path to yolo pre-trained weights', default='yolov3-tiny.weights')
 ap.add_argument('-cl', '--classes', required=False,
-                help = 'path to text file containing class names',  default = 'cfg/yolov3.txt')
+                help='path to text file containing class names', default='cfg/yolov3.txt')
 ap.add_argument('-ic', '--invertcolor', required=False,
-                help = 'invert RGB 2 BGR',  default = 'False')
+                help='invert RGB 2 BGR', default='False')
 ap.add_argument('-fpt', '--fpsthrottle', required=False,
-                help = 'skips (int) x frames in order to catch up with the stream for slow machines 1 = no throttle',  default = 1)
+                help='skips (int) x frames in order to catch up with the stream for slow machines 1 = no throttle',
+                default=1)
 args = ap.parse_args()
+
 
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
@@ -43,13 +45,14 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
-def get_output_layers(net):
 
+def get_output_layers(net):
     layer_names = net.getLayerNames()
 
     output_layers = [layer_names[i[0] - 1] for i in net.getUnconnectedOutLayers()]
 
     return output_layers
+
 
 def save_bounded_image(image, class_id, confidence, x, y, x_plus_w, y_plus_h):
     label = str(classes[class_id])
@@ -57,30 +60,32 @@ def save_bounded_image(image, class_id, confidence, x, y, x_plus_w, y_plus_h):
     if not os.path.exists(dirname):
         os.makedirs(dirname)
 
-    filename = label + '_' + datetime.datetime.now().strftime('%Y-%m-%d_%H_%M_%S_%f') + '_conf' + "{:.2f}".format(confidence) + '.jpg'
-    print ('Saving bounding box:' + filename)
+    filename = label + '_' + datetime.datetime.now().strftime('%Y-%m-%d_%H_%M_%S_%f') + '_conf' + "{:.2f}".format(
+        confidence) + '.jpg'
+    print('Saving bounding box:' + filename)
     roi = image[y:y_plus_h, x:x_plus_w]
     if roi.any():
         if str2bool(args.invertcolor) == False:
             roi = cv2.cvtColor(roi, cv2.COLOR_RGB2BGR)
         cv2.imwrite(os.path.join(dirname, filename), roi)
 
+
 def draw_prediction(img, class_id, confidence, x, y, x_plus_w, y_plus_h):
     label = str(classes[class_id])
     color = COLORS[class_id]
 
-    cv2.rectangle(img, (x,y), (x_plus_w,y_plus_h), color, 3)
-    cv2.putText(img, label, (x-10,y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 3)
+    cv2.rectangle(img, (x, y), (x_plus_w, y_plus_h), color, 3)
+    cv2.putText(img, label, (x - 10, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 3)
+
 
 def detect(image):
-
     Width = image.shape[1]
     Height = image.shape[0]
     scale = 0.00392
 
     net = cv2.dnn.readNet(args.weights, args.config)
 
-    blob = cv2.dnn.blobFromImage(image, scale, (416,416), (0,0,0), True, crop=False)
+    blob = cv2.dnn.blobFromImage(image, scale, (416, 416), (0, 0, 0), True, crop=False)
 
     net.setInput(blob)
 
@@ -108,7 +113,6 @@ def detect(image):
                 confidences.append(float(confidence))
                 boxes.append([x, y, w, h])
 
-
     indices = cv2.dnn.NMSBoxes(boxes, confidences, conf_threshold, nms_threshold)
 
     orgImage = image.copy()
@@ -119,11 +123,12 @@ def detect(image):
         y = box[1]
         w = box[2]
         h = box[3]
-        save_bounded_image(orgImage, class_ids[i], confidences[i], round(x), round(y), round(x+w), round(y+h))
-        draw_prediction(image, class_ids[i], confidences[i], round(x), round(y), round(x+w), round(y+h))
+        save_bounded_image(orgImage, class_ids[i], confidences[i], round(x), round(y), round(x + w), round(y + h))
+        draw_prediction(image, class_ids[i], confidences[i], round(x), round(y), round(x + w), round(y + h))
     if str2bool(args.invertcolor) == True:
         image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
     return image
+
 
 def processvideo(file):
     cap = cv2.VideoCapture(file)
@@ -131,11 +136,11 @@ def processvideo(file):
     writer = imageio.write_frames(args.outputfile, (int(cap.get(3)), int(cap.get(4))))
     writer.send(None)
     frame_counter = 0
-    while(cap.isOpened()):
+    while (cap.isOpened()):
         frame_counter = frame_counter + 1
         ret, frame = cap.read()
         print('Detecting objects in frame ' + str(frame_counter))
-        if ret==True:
+        if ret == True:
             if not frame is None:
                 image = detect(frame)
                 writer.send(frame)
@@ -145,6 +150,7 @@ def processvideo(file):
             break
     cap.release()
     writer.close()
+
 
 # Doing some Object Detection on a video
 classes = None
@@ -160,12 +166,12 @@ if args.input.startswith('rtsp'):
         writer = imageio.write_frames(args.outputfile, (int(cap.get(3)), int(cap.get(4))))
         writer.send(None)
     frame_counter = 0
-    while(True):
+    while (True):
         if int(args.framelimit) > 0 and frame_counter > int(args.framestart) + int(args.framelimit):
             writer.close()
             break
 
-        if frame_counter % int(args.fpsthrottle) ==0:
+        if frame_counter % int(args.fpsthrottle) == 0:
             ret, frame = cap.read()
             if ret and frame_counter >= int(args.framestart):
                 print('Detecting objects in frame ' + str(frame_counter))
@@ -176,7 +182,7 @@ if args.input.startswith('rtsp'):
                 print('Skipping frame ' + str(frame_counter))
         else:
             print('FPS throttling. Skipping frame ' + str(frame_counter))
-        frame_counter=frame_counter+1
+        frame_counter = frame_counter + 1
 
 else:
     if os.path.isdir(args.input):
